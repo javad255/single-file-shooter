@@ -1,5 +1,5 @@
 import { GameState } from './types';
-import { CANVAS_WIDTH, CANVAS_HEIGHT, COLORS } from './constants';
+import { CANVAS_WIDTH, CANVAS_HEIGHT, COLORS, POWERUP_COLORS } from './constants';
 
 export const render = (ctx: CanvasRenderingContext2D, state: GameState, time: number) => {
   // Apply screen shake
@@ -10,13 +10,17 @@ export const render = (ctx: CanvasRenderingContext2D, state: GameState, time: nu
     ctx.translate(shakeX, shakeY);
   }
 
-  // Clear and draw background
-  ctx.fillStyle = COLORS.background;
+  // Draw gradient background
+  const gradient = ctx.createLinearGradient(0, 0, 0, CANVAS_HEIGHT);
+  gradient.addColorStop(0, COLORS.backgroundGradientTop);
+  gradient.addColorStop(1, COLORS.backgroundGradientBottom);
+  ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 
-  // Draw stars
+  // Draw stars (parallax layers)
   state.stars.forEach((star) => {
-    ctx.fillStyle = `rgba(255, 255, 255, ${star.brightness})`;
+    const twinkle = 0.7 + Math.sin(time * 0.003 + star.x * star.y) * 0.3;
+    ctx.fillStyle = `rgba(255, 255, 255, ${star.brightness * twinkle})`;
     ctx.beginPath();
     ctx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
     ctx.fill();
@@ -25,16 +29,85 @@ export const render = (ctx: CanvasRenderingContext2D, state: GameState, time: nu
   // Draw particles
   state.particles.forEach((particle) => {
     const alpha = particle.lifetime / particle.maxLifetime;
-    ctx.fillStyle = particle.color.replace(')', `, ${alpha})`).replace('rgb', 'rgba');
+    
+    if (particle.type === 'ring') {
+      ctx.strokeStyle = particle.color.replace(')', `, ${alpha * 0.5})`).replace('rgb', 'rgba').replace('#', '');
+      if (particle.color.startsWith('#')) {
+        const r = parseInt(particle.color.slice(1, 3), 16);
+        const g = parseInt(particle.color.slice(3, 5), 16);
+        const b = parseInt(particle.color.slice(5, 7), 16);
+        ctx.strokeStyle = `rgba(${r}, ${g}, ${b}, ${alpha * 0.5})`;
+      }
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(particle.position.x, particle.position.y, particle.size, 0, Math.PI * 2);
+      ctx.stroke();
+    } else {
+      let color = particle.color;
+      if (color.startsWith('#')) {
+        const r = parseInt(color.slice(1, 3), 16);
+        const g = parseInt(color.slice(3, 5), 16);
+        const b = parseInt(color.slice(5, 7), 16);
+        ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${alpha})`;
+      } else {
+        ctx.fillStyle = color.replace(')', `, ${alpha})`).replace('rgb', 'rgba');
+      }
+      ctx.beginPath();
+      ctx.arc(particle.position.x, particle.position.y, particle.size * alpha, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  });
+
+  // Draw power-ups
+  state.powerUps.forEach((powerUp) => {
+    const color = POWERUP_COLORS[powerUp.type];
+    const pulse = 1 + Math.sin(time * 0.01) * 0.1;
+    
+    ctx.shadowColor = color;
+    ctx.shadowBlur = 15;
+    ctx.fillStyle = color;
+    
+    // Draw power-up icon
     ctx.beginPath();
-    ctx.arc(particle.position.x, particle.position.y, particle.size * alpha, 0, Math.PI * 2);
+    const cx = powerUp.position.x + powerUp.width / 2;
+    const cy = powerUp.position.y + powerUp.height / 2;
+    const radius = powerUp.width / 2 * pulse;
+    
+    // Outer ring
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2;
+    ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+    ctx.stroke();
+    
+    // Inner symbol
+    ctx.beginPath();
+    if (powerUp.type === 'multishot') {
+      // Three dots
+      ctx.arc(cx - 5, cy, 3, 0, Math.PI * 2);
+      ctx.arc(cx, cy, 3, 0, Math.PI * 2);
+      ctx.arc(cx + 5, cy, 3, 0, Math.PI * 2);
+    } else if (powerUp.type === 'rapidfire') {
+      // Lightning bolt
+      ctx.moveTo(cx + 3, cy - 6);
+      ctx.lineTo(cx - 2, cy);
+      ctx.lineTo(cx + 1, cy);
+      ctx.lineTo(cx - 3, cy + 6);
+    } else if (powerUp.type === 'shield') {
+      // Shield shape
+      ctx.arc(cx, cy, 5, 0, Math.PI * 2);
+    } else if (powerUp.type === 'bomb') {
+      // Bomb
+      ctx.arc(cx, cy + 2, 5, 0, Math.PI * 2);
+      ctx.moveTo(cx, cy - 3);
+      ctx.lineTo(cx, cy - 6);
+    }
     ctx.fill();
+    ctx.shadowBlur = 0;
   });
 
   // Draw bullets
   state.bullets.forEach((bullet) => {
     const color = bullet.isEnemy ? COLORS.enemyBullet : COLORS.bullet;
-    const glowColor = bullet.isEnemy ? COLORS.enemyGlow : COLORS.bulletGlow;
 
     // Glow effect
     ctx.shadowColor = color;
@@ -47,11 +120,9 @@ export const render = (ctx: CanvasRenderingContext2D, state: GameState, time: nu
   // Draw enemies
   state.enemies.forEach((enemy) => {
     let color = COLORS.enemy;
-    let glowColor = COLORS.enemyGlow;
 
     if (enemy.pattern === 'heavy') {
       color = COLORS.heavy;
-      glowColor = COLORS.heavyGlow;
     }
 
     ctx.shadowColor = color;
@@ -61,7 +132,6 @@ export const render = (ctx: CanvasRenderingContext2D, state: GameState, time: nu
     ctx.fillStyle = color;
     ctx.beginPath();
     const cx = enemy.position.x + enemy.width / 2;
-    const cy = enemy.position.y + enemy.height / 2;
     
     // Inverted triangle ship
     ctx.moveTo(cx, enemy.position.y + enemy.height);
@@ -85,9 +155,11 @@ export const render = (ctx: CanvasRenderingContext2D, state: GameState, time: nu
   // Draw boss
   if (state.boss) {
     const boss = state.boss;
-    ctx.shadowColor = COLORS.boss;
-    ctx.shadowBlur = 20;
-    ctx.fillStyle = COLORS.boss;
+    const phaseColor = boss.phase === 3 ? '#ff0000' : boss.phase === 2 ? '#ff6600' : COLORS.boss;
+    
+    ctx.shadowColor = phaseColor;
+    ctx.shadowBlur = 20 + Math.sin(time * 0.01) * 5;
+    ctx.fillStyle = phaseColor;
 
     // Boss shape - large menacing ship
     ctx.beginPath();
@@ -121,6 +193,24 @@ export const render = (ctx: CanvasRenderingContext2D, state: GameState, time: nu
   if (state.gameStatus === 'playing') {
     const player = state.player;
     const flashOn = !player.invincible || Math.floor(time / 100) % 2 === 0;
+
+    // Draw shield if active
+    if (player.powerUps.shield > 0) {
+      const shieldAlpha = 0.3 + Math.sin(time * 0.01) * 0.1;
+      ctx.strokeStyle = `rgba(0, 200, 255, ${shieldAlpha})`;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(
+        player.position.x + player.width / 2,
+        player.position.y + player.height / 2,
+        player.width * 0.8,
+        0,
+        Math.PI * 2
+      );
+      ctx.stroke();
+      ctx.fillStyle = `rgba(0, 200, 255, ${shieldAlpha * 0.3})`;
+      ctx.fill();
+    }
 
     if (flashOn) {
       ctx.shadowColor = COLORS.player;
@@ -158,10 +248,10 @@ export const render = (ctx: CanvasRenderingContext2D, state: GameState, time: nu
   ctx.restore();
 
   // Draw UI (not affected by screen shake)
-  drawUI(ctx, state);
+  drawUI(ctx, state, time);
 };
 
-const drawUI = (ctx: CanvasRenderingContext2D, state: GameState) => {
+const drawUI = (ctx: CanvasRenderingContext2D, state: GameState, time: number) => {
   ctx.font = 'bold 16px "Orbitron", sans-serif';
   ctx.textAlign = 'left';
 
@@ -176,7 +266,17 @@ const drawUI = (ctx: CanvasRenderingContext2D, state: GameState) => {
   ctx.shadowColor = COLORS.uiSecondary;
   ctx.fillText(`HIGH: ${state.highScore.toString().padStart(8, '0')}`, 10, 45);
 
+  // Combo
+  if (state.combo > 1) {
+    const comboAlpha = state.comboTimer / 2000;
+    ctx.font = 'bold 14px "Orbitron", sans-serif';
+    ctx.fillStyle = `rgba(255, 255, 0, ${comboAlpha})`;
+    ctx.shadowColor = COLORS.combo;
+    ctx.fillText(`COMBO x${Math.min(state.combo, 10)}`, 10, 65);
+  }
+
   // Wave
+  ctx.font = 'bold 16px "Orbitron", sans-serif';
   ctx.textAlign = 'right';
   ctx.fillStyle = COLORS.ui;
   ctx.shadowColor = COLORS.ui;
@@ -196,12 +296,46 @@ const drawUI = (ctx: CanvasRenderingContext2D, state: GameState) => {
     ctx.fill();
   }
 
+  // Active power-ups indicator
+  const activePowerUps: string[] = [];
+  if (state.player.powerUps.multishot > 0) activePowerUps.push('MULTI');
+  if (state.player.powerUps.rapidfire > 0) activePowerUps.push('RAPID');
+  if (state.player.powerUps.shield > 0) activePowerUps.push('SHIELD');
+  
+  if (activePowerUps.length > 0) {
+    ctx.font = '10px "Share Tech Mono", monospace';
+    ctx.textAlign = 'right';
+    ctx.fillStyle = '#00ff00';
+    ctx.shadowColor = '#00ff00';
+    ctx.shadowBlur = 5;
+    ctx.fillText(activePowerUps.join(' | '), CANVAS_WIDTH - 10, 70);
+  }
+
+  // Wave announcement
+  if (state.waveAnnouncement > 0) {
+    const alpha = Math.min(state.waveAnnouncement / 500, 1);
+    ctx.font = 'bold 32px "Orbitron", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillStyle = `rgba(0, 255, 255, ${alpha})`;
+    ctx.shadowColor = COLORS.ui;
+    ctx.shadowBlur = 20;
+    ctx.fillText(`WAVE ${state.wave}`, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 - 50);
+    
+    ctx.font = '14px "Share Tech Mono", monospace';
+    ctx.fillStyle = `rgba(255, 0, 255, ${alpha})`;
+    ctx.shadowColor = COLORS.uiSecondary;
+    ctx.fillText('INCOMING', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 - 20);
+  }
+
   ctx.shadowBlur = 0;
 };
 
 export const renderMenu = (ctx: CanvasRenderingContext2D, state: GameState, time: number) => {
-  // Draw background
-  ctx.fillStyle = COLORS.background;
+  // Draw gradient background
+  const gradient = ctx.createLinearGradient(0, 0, 0, CANVAS_HEIGHT);
+  gradient.addColorStop(0, COLORS.backgroundGradientTop);
+  gradient.addColorStop(1, COLORS.backgroundGradientBottom);
+  ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 
   // Draw animated stars
@@ -244,7 +378,8 @@ export const renderMenu = (ctx: CanvasRenderingContext2D, state: GameState, time
   ctx.font = '12px "Share Tech Mono", monospace';
   ctx.fillStyle = COLORS.uiSecondary;
   ctx.shadowBlur = 5;
-  ctx.fillText('← → MOVE  |  SPACE FIRE', CANVAS_WIDTH / 2, CANVAS_HEIGHT * 0.85);
+  ctx.fillText('← → MOVE  |  SPACE FIRE', CANVAS_WIDTH / 2, CANVAS_HEIGHT * 0.8);
+  ctx.fillText('MOBILE: DRAG TO MOVE | TAP FIRE', CANVAS_WIDTH / 2, CANVAS_HEIGHT * 0.85);
 
   ctx.shadowBlur = 0;
 };

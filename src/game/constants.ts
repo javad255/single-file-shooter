@@ -1,4 +1,4 @@
-import { WaveConfig, EnemyPattern } from './types';
+import { WaveConfig, EnemyPattern, PowerUpType } from './types';
 
 export const CANVAS_WIDTH = 400;
 export const CANVAS_HEIGHT = 600;
@@ -6,7 +6,8 @@ export const CANVAS_HEIGHT = 600;
 export const PLAYER_WIDTH = 40;
 export const PLAYER_HEIGHT = 30;
 export const PLAYER_SPEED = 6;
-export const PLAYER_FIRE_RATE = 150; // ms between shots
+export const PLAYER_FIRE_RATE = 150;
+export const PLAYER_FIRE_RATE_RAPID = 80;
 
 export const BULLET_WIDTH = 4;
 export const BULLET_HEIGHT = 12;
@@ -21,12 +22,22 @@ export const BOSS_WIDTH = 80;
 export const BOSS_HEIGHT = 60;
 export const BOSS_SPEED = 2;
 
-export const INVINCIBILITY_DURATION = 2000; // ms
+export const POWERUP_WIDTH = 24;
+export const POWERUP_HEIGHT = 24;
+export const POWERUP_SPEED = 2;
+export const POWERUP_DURATION = 8000;
+export const POWERUP_DROP_CHANCE = 0.15;
+
+export const INVINCIBILITY_DURATION = 2000;
+export const COMBO_TIMEOUT = 2000;
 
 export const COLORS = {
   background: '#0a0a12',
+  backgroundGradientTop: '#0d0d1a',
+  backgroundGradientBottom: '#050508',
   player: '#00ffff',
   playerGlow: 'rgba(0, 255, 255, 0.5)',
+  playerShield: 'rgba(0, 200, 255, 0.3)',
   bullet: '#00ffff',
   bulletGlow: 'rgba(0, 255, 255, 0.8)',
   enemy: '#ff00ff',
@@ -41,6 +52,18 @@ export const COLORS = {
   star: '#ffffff',
   ui: '#00ffff',
   uiSecondary: '#ff00ff',
+  combo: '#ffff00',
+  powerUpMultishot: '#00ff00',
+  powerUpRapidfire: '#ffff00',
+  powerUpShield: '#00aaff',
+  powerUpBomb: '#ff4400',
+};
+
+export const POWERUP_COLORS: Record<PowerUpType, string> = {
+  multishot: COLORS.powerUpMultishot,
+  rapidfire: COLORS.powerUpRapidfire,
+  shield: COLORS.powerUpShield,
+  bomb: COLORS.powerUpBomb,
 };
 
 export const getWaveConfig = (wave: number): WaveConfig => {
@@ -52,10 +75,10 @@ export const getWaveConfig = (wave: number): WaveConfig => {
   if (wave >= 4) patterns.push('heavy');
   
   return {
-    enemyCount: Math.min(baseEnemies, 20),
+    enemyCount: Math.min(baseEnemies, 25),
     patterns,
-    spawnInterval: Math.max(1500 - wave * 100, 500),
-    enemySpeed: ENEMY_BASE_SPEED + wave * 0.2,
+    spawnInterval: Math.max(1500 - wave * 100, 400),
+    enemySpeed: ENEMY_BASE_SPEED + wave * 0.15,
     hasBoss: wave % 5 === 0 && wave > 0,
   };
 };

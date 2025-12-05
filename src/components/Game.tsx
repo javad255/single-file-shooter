@@ -8,10 +8,22 @@ import { ChevronLeft, ChevronRight, Crosshair } from 'lucide-react';
 
 const Game: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const [gameState, setGameState] = useState<GameState>(createInitialState);
   const inputRef = useRef<InputState>({ left: false, right: false, fire: false });
   const lastTimeRef = useRef<number>(0);
   const animationFrameRef = useRef<number>();
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile('ontouchstart' in window || navigator.maxTouchPoints > 0);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   const handleStart = useCallback(() => {
     audioManager.resume();
@@ -59,6 +71,65 @@ const Game: React.FC = () => {
     };
   }, [gameState.gameStatus, handleStart]);
 
+  // Touch/drag controls on canvas
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const getCanvasCoords = (clientX: number, clientY: number) => {
+      const rect = canvas.getBoundingClientRect();
+      const scaleX = CANVAS_WIDTH / rect.width;
+      return {
+        x: (clientX - rect.left) * scaleX,
+        y: (clientY - rect.top) * scaleX,
+      };
+    };
+
+    const handleTouchStart = (e: TouchEvent) => {
+      e.preventDefault();
+      audioManager.resume();
+      
+      if (gameState.gameStatus !== 'playing') {
+        handleStart();
+        return;
+      }
+
+      const touch = e.touches[0];
+      const coords = getCanvasCoords(touch.clientX, touch.clientY);
+      touchStartRef.current = coords;
+      inputRef.current.touchX = coords.x;
+      inputRef.current.fire = true;
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      e.preventDefault();
+      if (!touchStartRef.current) return;
+      
+      const touch = e.touches[0];
+      const coords = getCanvasCoords(touch.clientX, touch.clientY);
+      inputRef.current.touchX = coords.x;
+    };
+
+    const handleTouchEnd = (e: TouchEvent) => {
+      e.preventDefault();
+      touchStartRef.current = null;
+      inputRef.current.touchX = undefined;
+      inputRef.current.fire = false;
+    };
+
+    canvas.addEventListener('touchstart', handleTouchStart, { passive: false });
+    canvas.addEventListener('touchmove', handleTouchMove, { passive: false });
+    canvas.addEventListener('touchend', handleTouchEnd, { passive: false });
+    canvas.addEventListener('touchcancel', handleTouchEnd, { passive: false });
+
+    return () => {
+      canvas.removeEventListener('touchstart', handleTouchStart);
+      canvas.removeEventListener('touchmove', handleTouchMove);
+      canvas.removeEventListener('touchend', handleTouchEnd);
+      canvas.removeEventListener('touchcancel', handleTouchEnd);
+    };
+  }, [gameState.gameStatus, handleStart]);
+
   // Game loop
   useEffect(() => {
     const gameLoop = (timestamp: number) => {
@@ -95,40 +166,44 @@ const Game: React.FC = () => {
     };
   }, [gameState]);
 
-  // Touch controls
-  const handleTouchStart = (action: 'left' | 'right' | 'fire') => {
+  // Button touch controls (fallback)
+  const handleButtonStart = (action: 'left' | 'right' | 'fire') => {
     audioManager.resume();
     inputRef.current[action] = true;
   };
 
-  const handleTouchEnd = (action: 'left' | 'right' | 'fire') => {
+  const handleButtonEnd = (action: 'left' | 'right' | 'fire') => {
     inputRef.current[action] = false;
   };
 
   return (
-    <div className="game-container">
+    <div className="game-container" ref={containerRef}>
       <div className="stars" />
       
-      <div className="relative">
+      <div className="relative touch-none">
         <canvas
           ref={canvasRef}
           width={CANVAS_WIDTH}
           height={CANVAS_HEIGHT}
           className="game-canvas"
-          onClick={handleStart}
+          onClick={() => {
+            if (!isMobile && gameState.gameStatus !== 'playing') {
+              handleStart();
+            }
+          }}
         />
         <div className="scanlines" />
       </div>
 
-      {/* Mobile Controls */}
+      {/* Mobile Controls - Alternative buttons */}
       <div className="mobile-controls">
         <button
           className="control-btn"
-          onTouchStart={() => handleTouchStart('left')}
-          onTouchEnd={() => handleTouchEnd('left')}
-          onMouseDown={() => handleTouchStart('left')}
-          onMouseUp={() => handleTouchEnd('left')}
-          onMouseLeave={() => handleTouchEnd('left')}
+          onTouchStart={() => handleButtonStart('left')}
+          onTouchEnd={() => handleButtonEnd('left')}
+          onMouseDown={() => handleButtonStart('left')}
+          onMouseUp={() => handleButtonEnd('left')}
+          onMouseLeave={() => handleButtonEnd('left')}
         >
           <ChevronLeft className="w-8 h-8 text-primary" />
         </button>
@@ -136,35 +211,42 @@ const Game: React.FC = () => {
         <button
           className="control-btn fire-btn"
           onTouchStart={() => {
-            handleTouchStart('fire');
+            handleButtonStart('fire');
             if (gameState.gameStatus !== 'playing') {
               handleStart();
             }
           }}
-          onTouchEnd={() => handleTouchEnd('fire')}
+          onTouchEnd={() => handleButtonEnd('fire')}
           onMouseDown={() => {
-            handleTouchStart('fire');
+            handleButtonStart('fire');
             if (gameState.gameStatus !== 'playing') {
               handleStart();
             }
           }}
-          onMouseUp={() => handleTouchEnd('fire')}
-          onMouseLeave={() => handleTouchEnd('fire')}
+          onMouseUp={() => handleButtonEnd('fire')}
+          onMouseLeave={() => handleButtonEnd('fire')}
         >
           <Crosshair className="w-10 h-10 text-secondary" />
         </button>
         
         <button
           className="control-btn"
-          onTouchStart={() => handleTouchStart('right')}
-          onTouchEnd={() => handleTouchEnd('right')}
-          onMouseDown={() => handleTouchStart('right')}
-          onMouseUp={() => handleTouchEnd('right')}
-          onMouseLeave={() => handleTouchEnd('right')}
+          onTouchStart={() => handleButtonStart('right')}
+          onTouchEnd={() => handleButtonEnd('right')}
+          onMouseDown={() => handleButtonStart('right')}
+          onMouseUp={() => handleButtonEnd('right')}
+          onMouseLeave={() => handleButtonEnd('right')}
         >
           <ChevronRight className="w-8 h-8 text-primary" />
         </button>
       </div>
+
+      {/* Touch instruction for mobile */}
+      {isMobile && gameState.gameStatus === 'playing' && (
+        <div className="text-center mt-2 text-xs text-muted-foreground opacity-50">
+          Drag on screen to move • Touch to fire
+        </div>
+      )}
     </div>
   );
 };

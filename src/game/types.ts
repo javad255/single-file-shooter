@@ -3,6 +3,17 @@ export interface Vector2D {
   y: number;
 }
 
+export type PowerUpType = 'multishot' | 'rapidfire' | 'shield' | 'bomb';
+
+export interface PowerUp {
+  position: Vector2D;
+  velocity: Vector2D;
+  width: number;
+  height: number;
+  type: PowerUpType;
+  lifetime: number;
+}
+
 export interface Player {
   position: Vector2D;
   velocity: Vector2D;
@@ -13,6 +24,11 @@ export interface Player {
   lives: number;
   invincible: boolean;
   invincibleUntil: number;
+  powerUps: {
+    multishot: number; // duration remaining
+    rapidfire: number;
+    shield: number;
+  };
 }
 
 export interface Bullet {
@@ -66,7 +82,9 @@ export interface Particle {
   size: number;
   lifetime: number;
   maxLifetime: number;
-  type: 'explosion' | 'trail' | 'spark';
+  type: 'explosion' | 'trail' | 'spark' | 'ring';
+  rotation?: number;
+  rotationSpeed?: number;
 }
 
 export interface Star {
@@ -75,6 +93,7 @@ export interface Star {
   size: number;
   speed: number;
   brightness: number;
+  layer: number; // 0 = far, 1 = mid, 2 = near (parallax)
 }
 
 export interface WaveConfig {
@@ -91,19 +110,24 @@ export interface GameState {
   enemies: Enemy[];
   boss: Boss | null;
   particles: Particle[];
+  powerUps: PowerUp[];
   stars: Star[];
   score: number;
   highScore: number;
+  combo: number;
+  comboTimer: number;
   wave: number;
   waveEnemiesSpawned: number;
   waveEnemiesKilled: number;
   lastSpawnTime: number;
   gameStatus: 'menu' | 'playing' | 'paused' | 'gameOver';
   screenShake: number;
+  waveAnnouncement: number; // Timer for "WAVE X" display
 }
 
 export interface InputState {
   left: boolean;
   right: boolean;
   fire: boolean;
+  touchX?: number; // For drag controls
 }

@@ -2,23 +2,44 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>478c56dd-28f5-4b23-bb91-6a47c4c93888</title>
-    <meta name="description" content="Lovable Generated Project" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Blastar - Arcade Shooter</title>
+    <meta name="description" content="Blastar is a retro-style vertical space shooter with neon visuals, power-ups, boss battles, and addictive arcade gameplay. Play free in your browser!" />
     <meta name="author" content="Lovable" />
+    <meta name="keywords" content="arcade game, space shooter, retro game, browser game, HTML5 game, vertical shooter" />
+    <meta name="theme-color" content="#00ffff" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="mobile-web-app-capable" content="yes" />
 
-    <meta property="og:title" content="478c56dd-28f5-4b23-bb91-6a47c4c93888" />
-    <meta property="og:description" content="Lovable Generated Project" />
+    <meta property="og:title" content="Blastar - Arcade Shooter" />
+    <meta property="og:description" content="A retro-style vertical space shooter with neon visuals and addictive gameplay" />
     <meta property="og:type" content="website" />
     <meta property="og:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
 
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:site" content="@Lovable" />
     <meta name="twitter:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
+
+    <link rel="manifest" href="/manifest.json" />
+    <link rel="apple-touch-icon" href="/favicon.ico" />
   </head>
 
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js')
+            .then((registration) => {
+              console.log('SW registered:', registration.scope);
+            })
+            .catch((error) => {
+              console.log('SW registration failed:', error);
+            });
+        });
+      }
+    </script>
   </body>
 </html>
