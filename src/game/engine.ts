@@ -7,7 +7,9 @@ import {
   Boss,
   Particle,
   Star,
+  PowerUp,
   EnemyPattern,
+  PowerUpType,
 } from './types';
 import {
   CANVAS_WIDTH,
@@ -16,6 +18,7 @@ import {
   PLAYER_HEIGHT,
   PLAYER_SPEED,
   PLAYER_FIRE_RATE,
+  PLAYER_FIRE_RATE_RAPID,
   BULLET_WIDTH,
   BULLET_HEIGHT,
   BULLET_SPEED,
@@ -25,7 +28,13 @@ import {
   BOSS_WIDTH,
   BOSS_HEIGHT,
   BOSS_SPEED,
+  POWERUP_WIDTH,
+  POWERUP_HEIGHT,
+  POWERUP_SPEED,
+  POWERUP_DURATION,
+  POWERUP_DROP_CHANCE,
   INVINCIBILITY_DURATION,
+  COMBO_TIMEOUT,
   getWaveConfig,
   ENEMY_CONFIG,
 } from './constants';
@@ -42,15 +51,19 @@ export const createInitialState = (): GameState => {
     enemies: [],
     boss: null,
     particles: [],
+    powerUps: [],
     stars: createStarfield(),
     score: 0,
     highScore,
+    combo: 0,
+    comboTimer: 0,
     wave: 1,
     waveEnemiesSpawned: 0,
     waveEnemiesKilled: 0,
     lastSpawnTime: 0,
     gameStatus: 'menu',
     screenShake: 0,
+    waveAnnouncement: 0,
   };
 };
 
@@ -64,17 +77,24 @@ const createPlayer = (): Player => ({
   lives: 3,
   invincible: false,
   invincibleUntil: 0,
+  powerUps: {
+    multishot: 0,
+    rapidfire: 0,
+    shield: 0,
+  },
 });
 
 const createStarfield = (): Star[] => {
   const stars: Star[] = [];
-  for (let i = 0; i < 100; i++) {
+  for (let i = 0; i < 150; i++) {
+    const layer = Math.floor(Math.random() * 3);
     stars.push({
       x: Math.random() * CANVAS_WIDTH,
       y: Math.random() * CANVAS_HEIGHT,
-      size: Math.random() * 2 + 0.5,
-      speed: Math.random() * 2 + 0.5,
-      brightness: Math.random() * 0.5 + 0.5,
+      size: 0.5 + layer * 0.5 + Math.random() * 0.5,
+      speed: 0.3 + layer * 0.8 + Math.random() * 0.3,
+      brightness: 0.3 + layer * 0.2 + Math.random() * 0.3,
+      layer,
     });
   }
   return stars;
@@ -119,15 +139,39 @@ export const createBoss = (wave: number): Boss => ({
   points: 2000 + wave * 500,
 });
 
-const createBullet = (x: number, y: number, isEnemy: boolean, vx = 0): Bullet => ({
+const createBullet = (x: number, y: number, isEnemy: boolean, vx = 0, vy?: number): Bullet => ({
   position: { x, y },
-  velocity: { x: vx, y: isEnemy ? ENEMY_BULLET_SPEED : -BULLET_SPEED },
+  velocity: { x: vx, y: vy ?? (isEnemy ? ENEMY_BULLET_SPEED : -BULLET_SPEED) },
   width: BULLET_WIDTH,
   height: BULLET_HEIGHT,
   isEnemy,
 });
 
-const createExplosion = (x: number, y: number, count: number, color: string): Particle[] => {
+const createPowerUp = (x: number, y: number): PowerUp => {
+  const types: PowerUpType[] = ['multishot', 'rapidfire', 'shield', 'bomb'];
+  const weights = [0.35, 0.35, 0.2, 0.1];
+  let rand = Math.random();
+  let type: PowerUpType = 'multishot';
+  
+  for (let i = 0; i < types.length; i++) {
+    rand -= weights[i];
+    if (rand <= 0) {
+      type = types[i];
+      break;
+    }
+  }
+  
+  return {
+    position: { x: x - POWERUP_WIDTH / 2, y },
+    velocity: { x: 0, y: POWERUP_SPEED },
+    width: POWERUP_WIDTH,
+    height: POWERUP_HEIGHT,
+    type,
+    lifetime: 10000,
+  };
+};
+
+const createExplosion = (x: number, y: number, count: number, color: string, type: 'explosion' | 'spark' = 'explosion'): Particle[] => {
   const particles: Particle[] = [];
   for (let i = 0; i < count; i++) {
     const angle = (Math.PI * 2 * i) / count + Math.random() * 0.5;
@@ -136,14 +180,34 @@ const createExplosion = (x: number, y: number, count: number, color: string): Pa
       position: { x, y },
       velocity: { x: Math.cos(angle) * speed, y: Math.sin(angle) * speed },
       color,
-      size: 2 + Math.random() * 3,
-      lifetime: 0.5 + Math.random() * 0.5,
-      maxLifetime: 0.5 + Math.random() * 0.5,
-      type: 'explosion',
+      size: type === 'spark' ? 1 + Math.random() * 2 : 2 + Math.random() * 3,
+      lifetime: type === 'spark' ? 0.3 + Math.random() * 0.3 : 0.5 + Math.random() * 0.5,
+      maxLifetime: type === 'spark' ? 0.3 + Math.random() * 0.3 : 0.5 + Math.random() * 0.5,
+      type,
     });
   }
   return particles;
 };
+
+const createRing = (x: number, y: number, color: string): Particle => ({
+  position: { x, y },
+  velocity: { x: 0, y: 0 },
+  color,
+  size: 10,
+  lifetime: 0.4,
+  maxLifetime: 0.4,
+  type: 'ring',
+});
+
+const createTrail = (x: number, y: number, color: string): Particle => ({
+  position: { x, y },
+  velocity: { x: (Math.random() - 0.5) * 2, y: 2 + Math.random() * 2 },
+  color,
+  size: 2 + Math.random() * 2,
+  lifetime: 0.2 + Math.random() * 0.2,
+  maxLifetime: 0.2 + Math.random() * 0.2,
+  type: 'trail',
+});
 
 const checkCollision = (
   a: { position: { x: number; y: number }; width: number; height: number },
@@ -166,9 +230,9 @@ export const updateGame = (
   if (state.gameStatus !== 'playing') return state;
 
   let newState = { ...state };
-  const dt = deltaTime / 16.67; // Normalize to 60fps
+  const dt = deltaTime / 16.67;
 
-  // Update stars
+  // Update stars (parallax)
   newState.stars = newState.stars.map((star) => ({
     ...star,
     y: star.y + star.speed * dt,
@@ -178,10 +242,42 @@ export const updateGame = (
     }),
   }));
 
-  // Update player
+  // Update wave announcement
+  if (newState.waveAnnouncement > 0) {
+    newState.waveAnnouncement -= deltaTime;
+  }
+
+  // Update combo timer
+  if (newState.comboTimer > 0) {
+    newState.comboTimer -= deltaTime;
+    if (newState.comboTimer <= 0) {
+      newState.combo = 0;
+    }
+  }
+
+  // Update player power-up timers
+  newState.player = {
+    ...newState.player,
+    powerUps: {
+      multishot: Math.max(0, newState.player.powerUps.multishot - deltaTime),
+      rapidfire: Math.max(0, newState.player.powerUps.rapidfire - deltaTime),
+      shield: Math.max(0, newState.player.powerUps.shield - deltaTime),
+    },
+  };
+
+  // Update player position
   let playerVx = 0;
+  
+  // Keyboard/button controls
   if (input.left) playerVx -= PLAYER_SPEED;
   if (input.right) playerVx += PLAYER_SPEED;
+  
+  // Touch drag controls
+  if (input.touchX !== undefined) {
+    const targetX = input.touchX - newState.player.width / 2;
+    const diff = targetX - newState.player.position.x;
+    playerVx = Math.sign(diff) * Math.min(Math.abs(diff) * 0.3, PLAYER_SPEED * 1.5);
+  }
 
   newState.player = {
     ...newState.player,
@@ -189,14 +285,32 @@ export const updateGame = (
       x: Math.max(0, Math.min(CANVAS_WIDTH - newState.player.width, newState.player.position.x + playerVx * dt)),
       y: newState.player.position.y,
     },
-    invincible: currentTime < newState.player.invincibleUntil,
+    invincible: currentTime < newState.player.invincibleUntil || newState.player.powerUps.shield > 0,
   };
 
+  // Player engine trail
+  if (Math.random() < 0.3) {
+    const trailX = newState.player.position.x + newState.player.width / 2 + (Math.random() - 0.5) * 10;
+    const trailY = newState.player.position.y + newState.player.height;
+    newState.particles = [...newState.particles, createTrail(trailX, trailY, '#00ffff')];
+  }
+
   // Player shooting
-  if (input.fire && currentTime - newState.player.lastFired >= newState.player.fireRate) {
-    const bulletX = newState.player.position.x + newState.player.width / 2 - BULLET_WIDTH / 2;
+  const fireRate = newState.player.powerUps.rapidfire > 0 ? PLAYER_FIRE_RATE_RAPID : PLAYER_FIRE_RATE;
+  if (input.fire && currentTime - newState.player.lastFired >= fireRate) {
+    const centerX = newState.player.position.x + newState.player.width / 2 - BULLET_WIDTH / 2;
     const bulletY = newState.player.position.y;
-    newState.bullets = [...newState.bullets, createBullet(bulletX, bulletY, false)];
+    
+    if (newState.player.powerUps.multishot > 0) {
+      newState.bullets = [
+        ...newState.bullets,
+        createBullet(centerX - 10, bulletY, false, -1),
+        createBullet(centerX, bulletY, false),
+        createBullet(centerX + 10, bulletY, false, 1),
+      ];
+    } else {
+      newState.bullets = [...newState.bullets, createBullet(centerX, bulletY, false)];
+    }
     newState.player.lastFired = currentTime;
     audioManager.shoot();
   }
@@ -316,6 +430,16 @@ export const updateGame = (
         audioManager.enemyShoot();
       }
 
+      // Spawn minions in phase 3
+      if (boss.phase === 3 && currentTime - boss.minionSpawnTime > 5000) {
+        newState.enemies = [
+          ...newState.enemies,
+          createEnemy('dive', waveConfig.enemySpeed),
+          createEnemy('dive', waveConfig.enemySpeed),
+        ];
+        boss.minionSpawnTime = currentTime;
+      }
+
       // Update phase based on HP
       const hpPercent = boss.hp / boss.maxHp;
       if (hpPercent < 0.33) boss.phase = 3;
@@ -325,6 +449,50 @@ export const updateGame = (
     newState.boss = boss;
   }
 
+  // Update power-ups
+  newState.powerUps = newState.powerUps
+    .map((p) => ({
+      ...p,
+      position: { ...p.position, y: p.position.y + p.velocity.y * dt },
+      lifetime: p.lifetime - deltaTime,
+    }))
+    .filter((p) => p.position.y < CANVAS_HEIGHT && p.lifetime > 0);
+
+  // Collision: player vs power-ups
+  newState.powerUps.forEach((powerUp) => {
+    if (checkCollision(powerUp, newState.player)) {
+      if (powerUp.type === 'bomb') {
+        // Clear all enemies and bullets
+        newState.enemies.forEach((enemy) => {
+          newState.score += enemy.points;
+          newState.particles = [
+            ...newState.particles,
+            ...createExplosion(enemy.position.x + enemy.width / 2, enemy.position.y + enemy.height / 2, 10, '#ff00ff'),
+          ];
+        });
+        newState.enemies = [];
+        newState.bullets = newState.bullets.filter((b) => !b.isEnemy);
+        newState.screenShake = 15;
+        audioManager.bossExplosion();
+      } else {
+        newState.player = {
+          ...newState.player,
+          powerUps: {
+            ...newState.player.powerUps,
+            [powerUp.type]: POWERUP_DURATION,
+          },
+        };
+      }
+      newState.particles = [
+        ...newState.particles,
+        createRing(powerUp.position.x + powerUp.width / 2, powerUp.position.y + powerUp.height / 2, '#ffffff'),
+        ...createExplosion(powerUp.position.x + powerUp.width / 2, powerUp.position.y + powerUp.height / 2, 8, '#ffffff', 'spark'),
+      ];
+      audioManager.powerUp();
+    }
+  });
+  newState.powerUps = newState.powerUps.filter((p) => !checkCollision(p, newState.player));
+
   // Collision: player bullets vs enemies
   const playerBullets = newState.bullets.filter((b) => !b.isEnemy);
   playerBullets.forEach((bullet) => {
@@ -333,8 +501,19 @@ export const updateGame = (
         newState.enemies[ei] = { ...enemy, hp: enemy.hp - 1 };
         newState.bullets = newState.bullets.filter((b) => b !== bullet);
         
+        // Hit sparks
+        newState.particles = [
+          ...newState.particles,
+          ...createExplosion(bullet.position.x, bullet.position.y, 4, '#ffffff', 'spark'),
+        ];
+        
         if (newState.enemies[ei].hp <= 0) {
-          newState.score += enemy.points;
+          // Update combo
+          newState.combo++;
+          newState.comboTimer = COMBO_TIMEOUT;
+          const comboMultiplier = Math.min(newState.combo, 10);
+          newState.score += enemy.points * comboMultiplier;
+          
           newState.waveEnemiesKilled++;
           newState.particles = [
             ...newState.particles,
@@ -344,9 +523,18 @@ export const updateGame = (
               15,
               enemy.pattern === 'heavy' ? '#ff8800' : '#ff00ff'
             ),
+            createRing(enemy.position.x + enemy.width / 2, enemy.position.y + enemy.height / 2, enemy.pattern === 'heavy' ? '#ff8800' : '#ff00ff'),
           ];
           newState.screenShake = 5;
           audioManager.explosion();
+
+          // Power-up drop
+          if (Math.random() < POWERUP_DROP_CHANCE) {
+            newState.powerUps = [
+              ...newState.powerUps,
+              createPowerUp(enemy.position.x + enemy.width / 2, enemy.position.y + enemy.height / 2),
+            ];
+          }
         }
       }
     });
@@ -357,7 +545,7 @@ export const updateGame = (
       newState.bullets = newState.bullets.filter((b) => b !== bullet);
       newState.particles = [
         ...newState.particles,
-        ...createExplosion(bullet.position.x, bullet.position.y, 5, '#ff4444'),
+        ...createExplosion(bullet.position.x, bullet.position.y, 5, '#ff4444', 'spark'),
       ];
 
       if (newState.boss.hp <= 0) {
@@ -369,6 +557,12 @@ export const updateGame = (
             newState.boss.position.y + newState.boss.height / 2,
             40,
             '#ff4444'
+          ),
+          ...createExplosion(
+            newState.boss.position.x + newState.boss.width / 2,
+            newState.boss.position.y + newState.boss.height / 2,
+            20,
+            '#ffff00'
           ),
         ];
         newState.screenShake = 20;
@@ -382,71 +576,85 @@ export const updateGame = (
   newState.enemies = newState.enemies.filter((e) => e.hp > 0);
 
   // Collision: enemy bullets vs player
-  if (!newState.player.invincible) {
+  const isShielded = newState.player.powerUps.shield > 0;
+  if (!newState.player.invincible || isShielded) {
     const enemyBullets = newState.bullets.filter((b) => b.isEnemy);
     enemyBullets.forEach((bullet) => {
       if (checkCollision(bullet, newState.player)) {
-        newState.player = {
-          ...newState.player,
-          lives: newState.player.lives - 1,
-          invincible: true,
-          invincibleUntil: currentTime + INVINCIBILITY_DURATION,
-        };
-        newState.bullets = newState.bullets.filter((b) => b !== bullet);
-        newState.particles = [
-          ...newState.particles,
-          ...createExplosion(
-            newState.player.position.x + newState.player.width / 2,
-            newState.player.position.y + newState.player.height / 2,
-            20,
-            '#00ffff'
-          ),
-        ];
-        newState.screenShake = 10;
-        audioManager.playerHit();
+        if (isShielded) {
+          // Shield absorbs hit
+          newState.bullets = newState.bullets.filter((b) => b !== bullet);
+          newState.particles = [
+            ...newState.particles,
+            ...createExplosion(bullet.position.x, bullet.position.y, 8, '#00aaff', 'spark'),
+          ];
+        } else if (!newState.player.invincible) {
+          newState.player = {
+            ...newState.player,
+            lives: newState.player.lives - 1,
+            invincible: true,
+            invincibleUntil: currentTime + INVINCIBILITY_DURATION,
+          };
+          newState.bullets = newState.bullets.filter((b) => b !== bullet);
+          newState.particles = [
+            ...newState.particles,
+            ...createExplosion(
+              newState.player.position.x + newState.player.width / 2,
+              newState.player.position.y + newState.player.height / 2,
+              20,
+              '#00ffff'
+            ),
+          ];
+          newState.screenShake = 10;
+          newState.combo = 0;
+          audioManager.playerHit();
 
-        if (newState.player.lives <= 0) {
-          newState.gameStatus = 'gameOver';
-          if (newState.score > newState.highScore) {
-            newState.highScore = newState.score;
-            localStorage.setItem(HIGH_SCORE_KEY, newState.score.toString());
+          if (newState.player.lives <= 0) {
+            newState.gameStatus = 'gameOver';
+            if (newState.score > newState.highScore) {
+              newState.highScore = newState.score;
+              localStorage.setItem(HIGH_SCORE_KEY, newState.score.toString());
+            }
+            audioManager.gameOver();
           }
-          audioManager.gameOver();
         }
       }
     });
 
     // Collision: enemies vs player
-    newState.enemies.forEach((enemy) => {
-      if (checkCollision(enemy, newState.player)) {
-        newState.player = {
-          ...newState.player,
-          lives: newState.player.lives - 1,
-          invincible: true,
-          invincibleUntil: currentTime + INVINCIBILITY_DURATION,
-        };
-        newState.particles = [
-          ...newState.particles,
-          ...createExplosion(
-            newState.player.position.x + newState.player.width / 2,
-            newState.player.position.y + newState.player.height / 2,
-            25,
-            '#00ffff'
-          ),
-        ];
-        newState.screenShake = 15;
-        audioManager.playerHit();
+    if (!isShielded && !newState.player.invincible) {
+      newState.enemies.forEach((enemy) => {
+        if (checkCollision(enemy, newState.player)) {
+          newState.player = {
+            ...newState.player,
+            lives: newState.player.lives - 1,
+            invincible: true,
+            invincibleUntil: currentTime + INVINCIBILITY_DURATION,
+          };
+          newState.particles = [
+            ...newState.particles,
+            ...createExplosion(
+              newState.player.position.x + newState.player.width / 2,
+              newState.player.position.y + newState.player.height / 2,
+              25,
+              '#00ffff'
+            ),
+          ];
+          newState.screenShake = 15;
+          newState.combo = 0;
+          audioManager.playerHit();
 
-        if (newState.player.lives <= 0) {
-          newState.gameStatus = 'gameOver';
-          if (newState.score > newState.highScore) {
-            newState.highScore = newState.score;
-            localStorage.setItem(HIGH_SCORE_KEY, newState.score.toString());
+          if (newState.player.lives <= 0) {
+            newState.gameStatus = 'gameOver';
+            if (newState.score > newState.highScore) {
+              newState.highScore = newState.score;
+              localStorage.setItem(HIGH_SCORE_KEY, newState.score.toString());
+            }
+            audioManager.gameOver();
           }
-          audioManager.gameOver();
         }
-      }
-    });
+      });
+    }
   }
 
   // Update particles
@@ -462,6 +670,7 @@ export const updateGame = (
         x: p.velocity.x * 0.98,
         y: p.velocity.y * 0.98,
       },
+      size: p.type === 'ring' ? p.size + 3 * dt : p.size,
     }))
     .filter((p) => p.lifetime > 0);
 
@@ -478,6 +687,7 @@ export const updateGame = (
     newState.wave++;
     newState.waveEnemiesSpawned = 0;
     newState.waveEnemiesKilled = 0;
+    newState.waveAnnouncement = 2000;
     audioManager.waveComplete();
   }
 
@@ -488,4 +698,5 @@ export const startGame = (state: GameState): GameState => ({
   ...createInitialState(),
   highScore: state.highScore,
   gameStatus: 'playing',
+  waveAnnouncement: 2000,
 });

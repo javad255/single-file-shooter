@@ -1,0 +1,18 @@
+{
+  "name": "Blastar - Arcade Shooter",
+  "short_name": "Blastar",
+  "description": "A retro-style vertical space shooter with neon visuals, power-ups, and boss battles",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a0a12",
+  "theme_color": "#00ffff",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "64x64",
+      "type": "image/x-icon"
+    }
+  ],
+  "categories": ["games", "entertainment"]
+}
