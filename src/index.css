@@ -2,95 +2,70 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
-All colors MUST be HSL.
-*/
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Share+Tech+Mono&display=swap');
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    /* Deep space background */
+    --background: 240 20% 4%;
+    --foreground: 180 100% 90%;
 
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    /* Cards - slightly lighter space */
+    --card: 240 15% 8%;
+    --card-foreground: 180 100% 90%;
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover: 240 15% 8%;
+    --popover-foreground: 180 100% 90%;
 
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
+    /* Primary - Electric Cyan */
+    --primary: 180 100% 50%;
+    --primary-foreground: 240 20% 4%;
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    /* Secondary - Neon Magenta */
+    --secondary: 320 100% 60%;
+    --secondary-foreground: 240 20% 4%;
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    /* Muted - Deep Purple */
+    --muted: 270 50% 20%;
+    --muted-foreground: 270 30% 60%;
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    /* Accent - Electric Yellow */
+    --accent: 50 100% 50%;
+    --accent-foreground: 240 20% 4%;
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    /* Destructive - Neon Red */
+    --destructive: 0 100% 60%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --border: 240 30% 20%;
+    --input: 240 30% 20%;
+    --ring: 180 100% 50%;
 
     --radius: 0.5rem;
 
-    --sidebar-background: 0 0% 98%;
+    /* Game-specific colors */
+    --player: 180 100% 60%;
+    --enemy: 320 100% 60%;
+    --boss: 0 100% 60%;
+    --bullet: 180 100% 70%;
+    --enemy-bullet: 320 100% 70%;
+    --particle: 50 100% 60%;
+    --explosion: 30 100% 60%;
+    --shield: 200 100% 70%;
 
-    --sidebar-foreground: 240 5.3% 26.1%;
+    /* Glow effects */
+    --glow-cyan: 0 0 20px hsl(180 100% 50% / 0.8);
+    --glow-magenta: 0 0 20px hsl(320 100% 60% / 0.8);
+    --glow-yellow: 0 0 20px hsl(50 100% 50% / 0.8);
 
-    --sidebar-primary: 240 5.9% 10%;
-
-    --sidebar-primary-foreground: 0 0% 98%;
-
-    --sidebar-accent: 240 4.8% 95.9%;
-
-    --sidebar-accent-foreground: 240 5.9% 10%;
-
-    --sidebar-border: 220 13% 91%;
-
-    --sidebar-ring: 217.2 91.2% 59.8%;
-  }
-
-  .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --sidebar-background: 240 15% 8%;
+    --sidebar-foreground: 180 100% 90%;
+    --sidebar-primary: 180 100% 50%;
+    --sidebar-primary-foreground: 240 20% 4%;
+    --sidebar-accent: 320 100% 60%;
+    --sidebar-accent-foreground: 240 20% 4%;
+    --sidebar-border: 240 30% 20%;
+    --sidebar-ring: 180 100% 50%;
   }
 }
 
@@ -100,6 +75,111 @@ All colors MUST be HSL.
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-game;
+    overflow: hidden;
   }
+}
+
+@layer components {
+  .game-container {
+    @apply relative w-full h-screen flex items-center justify-center overflow-hidden;
+    background: radial-gradient(ellipse at center, hsl(var(--muted)) 0%, hsl(var(--background)) 70%);
+  }
+
+  .game-canvas {
+    @apply rounded-lg shadow-2xl;
+    box-shadow: var(--glow-cyan), 0 0 60px hsl(180 100% 50% / 0.3);
+  }
+
+  .game-ui {
+    @apply absolute top-4 left-4 right-4 flex justify-between items-start pointer-events-none;
+  }
+
+  .score-display {
+    @apply font-mono text-primary text-xl md:text-2xl tracking-wider;
+    text-shadow: var(--glow-cyan);
+  }
+
+  .wave-display {
+    @apply font-mono text-secondary text-lg md:text-xl tracking-wider;
+    text-shadow: var(--glow-magenta);
+  }
+
+  .mobile-controls {
+    @apply fixed bottom-4 left-0 right-0 flex justify-center gap-4 md:hidden;
+  }
+
+  .control-btn {
+    @apply w-16 h-16 rounded-full bg-card/80 border-2 border-primary flex items-center justify-center;
+    @apply active:bg-primary/30 active:scale-95 transition-all;
+    box-shadow: var(--glow-cyan);
+  }
+
+  .fire-btn {
+    @apply w-20 h-20 bg-secondary/20 border-secondary;
+    box-shadow: var(--glow-magenta);
+  }
+
+  .fire-btn:active {
+    @apply bg-secondary/40;
+  }
+
+  .game-over-overlay {
+    @apply absolute inset-0 flex flex-col items-center justify-center bg-background/90 backdrop-blur-sm;
+  }
+
+  .title-text {
+    @apply text-4xl md:text-6xl font-bold text-primary tracking-widest;
+    text-shadow: var(--glow-cyan), 0 0 40px hsl(180 100% 50% / 0.5);
+    animation: pulse-glow 2s ease-in-out infinite;
+  }
+
+  .start-btn {
+    @apply px-8 py-4 text-xl font-bold bg-primary/20 border-2 border-primary rounded-lg;
+    @apply hover:bg-primary/40 hover:scale-105 transition-all cursor-pointer;
+    box-shadow: var(--glow-cyan);
+  }
+
+  .scanlines {
+    @apply absolute inset-0 pointer-events-none opacity-10;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      hsl(180 100% 50% / 0.1) 2px,
+      hsl(180 100% 50% / 0.1) 4px
+    );
+  }
+
+  .stars {
+    @apply absolute inset-0 pointer-events-none;
+    background-image: 
+      radial-gradient(2px 2px at 20px 30px, hsl(180 100% 90%), transparent),
+      radial-gradient(2px 2px at 40px 70px, hsl(320 100% 90%), transparent),
+      radial-gradient(1px 1px at 90px 40px, hsl(50 100% 90%), transparent),
+      radial-gradient(2px 2px at 130px 80px, hsl(180 100% 90%), transparent),
+      radial-gradient(1px 1px at 160px 120px, hsl(320 100% 90%), transparent);
+    background-repeat: repeat;
+    background-size: 200px 150px;
+    animation: twinkle 4s ease-in-out infinite;
+  }
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    text-shadow: var(--glow-cyan), 0 0 40px hsl(180 100% 50% / 0.5);
+  }
+  50% {
+    text-shadow: var(--glow-cyan), 0 0 60px hsl(180 100% 50% / 0.8), 0 0 80px hsl(180 100% 50% / 0.4);
+  }
+}
+
+@keyframes twinkle {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 0.6; }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
 }
